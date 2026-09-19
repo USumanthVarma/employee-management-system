@@ -1,0 +1,52 @@
+# Brings up the full stack: MySQL -> Spring Boot backend -> React frontend.
+# From the project root:  docker compose up --build
+# Frontend:  http://localhost:5173
+# Backend:   http://localhost:8080/swagger-ui.html
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ems-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ems_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: ems-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: mysql
+      # Overrides application-mysql.properties: "localhost" would not
+      # resolve inside the container network, but the "mysql" service
+      # name does.
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ems_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      JWT_SECRET: ThisIsADemoOnlySecretKeyForEMS-ChangeMeInProduction-2026
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    container_name: ems-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  mysql_data:
